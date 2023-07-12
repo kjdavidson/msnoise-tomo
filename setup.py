@@ -1,32 +1,21 @@
-try:
-    import setuptools  # @UnusedImport # NOQA
-except:
-    pass
-
-try:
-    import numpy  # @UnusedImport # NOQA
-except:
-    msg = ("No module named numpy. "
-           "Please install numpy first, it is needed before installing ObsPy.")
-    raise ImportError(msg)
-
-import sys
-import os
-import inspect
 import glob
+import inspect
+import os
 import platform
+import shutil
+import subprocess
+import sys
 
+import setuptools
+from setuptools import Extension, find_packages, setup
+
+from distutils.ccompiler import get_default_compiler
+from distutils.command.build import build
+from distutils.command.install import install
 from distutils.errors import DistutilsSetupError
-from numpy.distutils.core import setup
-from numpy.distutils.ccompiler import get_default_compiler
-from numpy.distutils.command.build import build
-from numpy.distutils.command.install import install
-from numpy.distutils.exec_command import exec_command, find_executable
-from numpy.distutils.misc_util import Configuration
- 
-from setuptools import find_packages
+from distutils.util import change_root
 
-from obspy.core.util.libnames import _get_lib_name
+#from obspy.core.util.libnames import _get_lib_name
 
 print(sys.path.pop(0))
 
@@ -36,18 +25,6 @@ SETUP_DIRECTORY = os.path.dirname(os.path.abspath(inspect.getfile(
     inspect.currentframe())))
 
 print(SETUP_DIRECTORY)
-
-# def find_packages():
-#     """
-#     Simple function to find all modules under the current folder.
-#     """
-#     modules = []
-#     for dirpath, _, filenames in os.walk(os.path.join(SETUP_DIRECTORY,
-#                                                       "msnoise_tomo")):
-#         if "__init__.py" in filenames:
-#             modules.append(os.path.relpath(dirpath, SETUP_DIRECTORY))
-#     return [_i.replace(os.sep, ".") for _i in modules]
-
 
 # check for MSVC
 if platform.system() == "Windows" and (
@@ -106,6 +83,16 @@ if IS_MSVC:
         return ext.export_symbols
     from distutils.command.build_ext import build_ext
     build_ext.get_export_symbols = _get_export_symbols
+    
+#def get_extensions():
+#    extensions=[]
+    
+    # Smoothing Matrix
+#    path = ["src"]
+#    files = [os.path.join(path, "mk_MatPaths.c"),]
+#    kwargs = {}
+#   extensions.append(Extension("mk_MatPaths", files, **kwargs))
+    
 
 
 def configuration(parent_package="", top_path=None):
@@ -113,6 +100,7 @@ def configuration(parent_package="", top_path=None):
     Config function mainly used to compile C code.
     """
     config = Configuration("", parent_package, top_path)
+    extensions = []
 
     # Smoothing Matrix
     path = "src"
@@ -122,8 +110,9 @@ def configuration(parent_package="", top_path=None):
     if IS_MSVC:
         # get export symbols
         kwargs['export_symbols'] = export_symbols(path, 'mk_MatPaths.def')
-    config.add_extension(_get_lib_name("mk_MatPaths", add_extension_suffix=False),
-                                       files, **kwargs)
+    #config.add_extension(_get_lib_name("mk_MatPaths", add_extension_suffix=False),
+    #                                   files, **kwargs)
+    extensions.append(Extension("mk_MatPaths", files, **kwargs))
 
     # Smoothing Matrix
     path = "src"
@@ -133,8 +122,9 @@ def configuration(parent_package="", top_path=None):
     if IS_MSVC:
         # get export symbols
         kwargs['export_symbols'] = export_symbols(path, 'mkMatSmoothing.def')
-    config.add_extension(_get_lib_name("mkMatSmoothing", add_extension_suffix=False),
-                                       files, **kwargs)
+    #config.add_extension(_get_lib_name("mkMatSmoothing", add_extension_suffix=False),
+    #                                   files, **kwargs)
+    extensions.append(Extension("mkMatSmoothing", files, **kwargs))
 
 
     # FTAN
@@ -153,15 +143,17 @@ def configuration(parent_package="", top_path=None):
         # get export symbols
         kwargs['export_symbols'] = export_symbols(path, 'vg_fta.def')
 
-    config.add_extension(_get_lib_name("vg_fta", add_extension_suffix=False), files, **kwargs)
+    #config.add_extension(_get_lib_name("vg_fta", add_extension_suffix=False), files, **kwargs)
+    extensions.append(Extension("vg_fta", files, **kwargs))
 
 
     # HACK to avoid: "WARNING: '' not a valid package name; please use only .-separated package names in setup.py"
     config = config.todict()
     config["packages"] = []
     del config["package_dir"]
-
+    return extensions
     return config
+
 
 
 def setupPackage():
